@@ -1,0 +1,108 @@
+name: ADF CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18.x
+
+      - name: Install ADF Utilities
+        run: npm install
+        working-directory: ${{ github.workspace }}/build
+
+      - name: Validate ADF Code
+        run: npm run build validate ${{ github.workspace }}/ /subscriptions/1f27f6e9-0c21-4373-9c4f-916aae23104f/resourceGroups/covid-reporting-rg/providers/Microsoft.DataFactory/factories/covid-reporting-adf-name1
+        working-directory: ${{ github.workspace }}/build
+
+      - name: Export ARM Template
+        run: npm run build export ${{ github.workspace }}/ /subscriptions/1f27f6e9-0c21-4373-9c4f-916aae23104f/resourceGroups/covid-reporting-rg/providers/Microsoft.DataFactory/factories/covid-reporting-adf-name1 ExportedArmTemplate
+        working-directory: ${{ github.workspace }}/build
+
+      - name: Upload ARM Template Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ExportedArmTemplate
+          path: ${{ github.workspace }}/build/ExportedArmTemplate
+
+  deploy-test:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+
+    steps:
+      - name: Download ARM Template Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ExportedArmTemplate
+          path: ExportedArmTemplate
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          enable-AzPSSession: true
+
+      - name: Install Required Az Modules
+        shell: pwsh
+        run: |
+          Install-Module -Name Az.Resources -Scope CurrentUser -Repository PSGallery -Force -AllowClobber
+
+      - name: Deploy ADF to TEST
+        uses: Azure/data-factory-deploy-action@v1.2.0
+        with:
+          resourceGroupName: test-cicd-rg
+          dataFactoryName: test-cicd-adf1
+          armTemplateFile: ExportedArmTemplate/ARMTemplateForFactory.json
+          armTemplateParametersFile: ExportedArmTemplate/ARMTemplateParametersForFactory.json
+
+  deploy-prod:
+    needs: deploy-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 50
+
+    steps:
+      - name: Download ARM Template Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ExportedArmTemplate
+          path: ExportedArmTemplate
+
+      - name: Azure Login via OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          enable-AzPSSession: true
+
+      - name: Install Required Az Modules
+        shell: pwsh
+        run: |
+          Install-Module -Name Az.Resources -Scope CurrentUser -Repository PSGallery -Force -AllowClobber
+
+      - name: Deploy ADF to PROD
+        uses: Azure/data-factory-deploy-action@v1.2.0
+        with:
+          resourceGroupName: prod-cicd-rg1
+          dataFactoryName: prod-cicd-adf1
+          armTemplateFile: ExportedArmTemplate/ARMTemplateForFactory.json
+          armTemplateParametersFile: ExportedArmTemplate/ARMTemplateParametersForFactory.json
