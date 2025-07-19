@@ -69,8 +69,8 @@ jobs:
       - name: Deploy ADF to TEST
         uses: Azure/data-factory-deploy-action@v1.2.0
         with:
-          resourceGroupName: test-cicd-rg
-          dataFactoryName: test-cicd-adf1
+          resourceGroupName: covid-reporting-rg
+          dataFactoryName: test-covid-reporting-adf-major
           armTemplateFile: ExportedArmTemplate/ARMTemplateForFactory.json
           armTemplateParametersFile: ExportedArmTemplate/ARMTemplateParametersForFactory.json
 
@@ -102,7 +102,7 @@ jobs:
       - name: Deploy ADF to PROD
         uses: Azure/data-factory-deploy-action@v1.2.0
         with:
-          resourceGroupName: prod-cicd-rg1
-          dataFactoryName: prod-cicd-adf1
+          resourceGroupName: covid-reporting-rg
+          dataFactoryName: prod-covid-reporting-adf-major
           armTemplateFile: ExportedArmTemplate/ARMTemplateForFactory.json
           armTemplateParametersFile: ExportedArmTemplate/ARMTemplateParametersForFactory.json
